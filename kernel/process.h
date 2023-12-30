@@ -102,6 +102,11 @@ process* alloc_process();
 int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
+// wait for a process
+// added @ lab3 chanllenge 1
+int proc_wait(int x);
+void insert_to_blocked_queue(process *proc);
+void wake_up_parent(process *proc);
 
 // current running process
 extern process* current;

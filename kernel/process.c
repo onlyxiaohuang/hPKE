@@ -169,6 +169,92 @@ int free_process( process* proc ) {
 }
 
 //
+//wait for the process
+// 
+
+int proc_wait(int nowid){
+  if(nowid == -1){
+    int now = 0;
+    for(int i = 0;i < NPROC; i ++){
+      
+      if(procs[i].parent == current){
+        now = 1;
+        if(procs[i].status == ZOMBIE)  return i;
+      }
+    }
+    if(now == 0)  return -1;
+    
+    insert_to_blocked_queue(current);
+    schedule();
+    return -2;//wait for the id;
+  }
+  else if(nowid >= 0 && nowid < NPROC){
+    if(procs[nowid].parent != current)
+      return -1;
+    if(procs[nowid].status == ZOMBIE) return nowid;
+
+    insert_to_blocked_queue(current);
+    schedule();
+    return -2;//wait for the next time
+  }
+  else{
+    return -1;
+  }
+}
+
+process * blocked_queue_head = NULL;
+
+// get a blocked queue
+void insert_to_blocked_queue(process *proc){
+  //the queue is empty
+  if(blocked_queue_head == NULL){
+    proc -> status = BLOCKED;
+    proc -> queue_next = NULL;
+    blocked_queue_head = proc;
+    return ;
+  }
+
+  //the queue is not empty(lianbiao)
+  process * it;
+  for(it = blocked_queue_head;it -> queue_next != NULL; it = it ->queue_next){
+    if(it == proc) return ; // we find the origin process
+  }
+  if(it == proc) return ;
+
+  proc -> status = BLOCKED;
+  proc -> queue_next = NULL;
+  it -> queue_next = proc;
+
+}
+
+//remove an element from blocked queue
+void wake_up_parent(process* proc){
+//  proc -> status = READY;
+  if(blocked_queue_head == NULL)  return;
+
+  process * it = blocked_queue_head;
+  if(it == proc -> parent){
+    blocked_queue_head = blocked_queue_head -> queue_next;
+    it -> status = READY;
+    insert_to_ready_queue(it);
+    return ;
+  }
+
+  process * last = it;
+  it = it -> queue_next;
+  for(;it != NULL;it = it -> queue_next){
+    if(it == proc -> parent){
+      last -> queue_next = it -> queue_next;
+      it -> status = READY;
+      insert_to_ready_queue(it);
+      return ;
+    } 
+    last = it; 
+  }
+  
+}
+
+//
 // implements fork syscal in kernel. added @lab3_1
 // basic idea here is to first allocate an empty process (child), then duplicate the
 // context and data segments of parent process to the child, and lastly, map other
@@ -241,6 +327,21 @@ int do_fork( process* parent)
         child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
         child->total_mapped_region++;
         break;
+      //added @ lab3 chanllenge 1
+      case DATA_SEGMENT:
+        for(int j = 0;j < parent -> mapped_info[i].npages;j ++){
+          uint64 addr = lookup_pa(parent -> pagetable,parent -> mapped_info[i].va + j * PGSIZE);
+          char *newadd = alloc_page();
+          memcpy(newadd,(void *)addr,PGSIZE);
+          map_pages(child -> pagetable,parent -> mapped_info[i].va + j * PGSIZE,PGSIZE,(uint64)newadd,prot_to_type(PROT_WRITE|PROT_READ,1));
+        }
+        // after mapping, register the vm region (do not delete codes below!)
+        child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
+        child->mapped_info[child->total_mapped_region].npages =
+          parent->mapped_info[i].npages;
+        child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
+        child->total_mapped_region++;        
+
     }
   }
 
