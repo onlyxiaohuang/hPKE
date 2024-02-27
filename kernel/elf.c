@@ -217,7 +217,29 @@ elf_status elf_load(elf_ctx *ctx) {
     // actual loading
     if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
       return EL_EIO;
-  }
+    }
+    //changed @ lab1_challenge2
+
+    char name[20];
+    uint64 maxva = 0;
+    elf_sect_header tmp_seg,name_seg;
+    ((elf_info *) ctx -> info) -> p -> debugline = NULL;
+    if(elf_fpread(ctx,(void *)&name_seg,sizeof(name_seg),ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(name_seg)) != sizeof(name_seg))
+        return EL_EIO;
+
+    for(i = 0,off = ctx -> ehdr.phoff; i < ctx -> ehdr.phnum;i ++ ,off += sizeof(tmp_seg)){
+        if(elf_fpread (ctx,(void *) & tmp_seg,sizeof (tmp_seg),off) != sizeof(tmp_seg)) return EL_EIO;
+
+
+        elf_fpread(ctx, (void *)name, 20, name_seg.offset + tmp_seg.name);
+        if (strcmp(name, ".debug_line") == 0) {
+            if (elf_fpread(ctx, (void *)maxva, tmp_seg.size, tmp_seg.offset) != tmp_seg.size) return EL_EIO;
+            make_addr_line(ctx, (char *)maxva, tmp_seg.size); break;
+        }
+    }
+
+    
+
 
   return EL_OK;
 }
