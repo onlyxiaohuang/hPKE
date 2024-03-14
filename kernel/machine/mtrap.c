@@ -12,7 +12,7 @@ static void handle_store_access_fault() { panic("Store/AMO access fault!"); }
 
 //lab1_challenge2
 static void handle_illegal_instruction() { 
-  sprint("");
+  //sprint("");
   panic("Illegal instruction!"); 
 
 }
@@ -35,23 +35,31 @@ static void handle_timer() {
 char path[150],error_code[100010];
 struct stat mystat;
 void print_line(addr_line *line){
+
+  
   int len = strlen(current -> dir[current -> file[line -> file].dir]);
   strcpy(path,current -> dir[current -> file[line -> file].dir]);
   path[len] = '/';
   strcpy(path + len + 1,current -> file[line->file].file);
+  sprint("%s\n",path);
 
 //read the unique content from path
   spike_file_t *f = spike_file_open(path,O_RDONLY,0);
   spike_file_stat(f,&mystat);
   spike_file_read(f,error_code,mystat.st_size);
   spike_file_close(f);
-  
+
+  sprint("error_code: %s\n",error_code);
+//  printu("")
+
+
   int offset = 0,cnt = 0;
   while(offset < mystat.st_size){
     int x = offset;
     while(x < mystat.st_size && error_code[x] != '\n') x ++;
     if(cnt == line -> line - 1){
       error_code[x] = '\0';
+//      sprint("I'm Here!!!\n\n");
       sprint("Runtime error at %s:%d\n%s\n",path,line->line,error_code + offset);
       break;
     }
@@ -62,6 +70,9 @@ void print_line(addr_line *line){
 
 void print_error(){
   uint64 mepc = read_csr(mepc);
+
+  sprint("current -> line_ind: %d\n",current -> line_ind);
+
   for(int i = 0;i < current -> line_ind;i ++)
     if(mepc < current -> line[i].addr){
       print_line(current -> line + i - 1);
@@ -74,6 +85,9 @@ void print_error(){
 //
 void handle_mtrap() {
   uint64 mcause = read_csr(mcause);
+
+  sprint("%d\n",mcause);
+
   switch (mcause) {
     case CAUSE_MTIMER:
       handle_timer();
