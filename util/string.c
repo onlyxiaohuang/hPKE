@@ -108,3 +108,19 @@ char* safestrcpy(char* s, const char* t, int n) {
   *s = 0;
   return os;
 }
+
+char *strcat(char *dst, char *src)
+{
+  char *dst_ptr = dst, *src_ptr = src;
+  while (*dst_ptr != '\0')
+  {
+    dst_ptr++;
+  }
+  while (*src_ptr != '\0')
+  {
+    *dst_ptr = *src_ptr;
+    dst_ptr++, src_ptr++;
+  }
+  *dst_ptr = '\0';
+  return dst;
+}

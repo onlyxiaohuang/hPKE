@@ -41,7 +41,7 @@ void print_line(addr_line *line){
   strcpy(path,current -> dir[current -> file[line -> file].dir]);
   path[len] = '/';
   strcpy(path + len + 1,current -> file[line->file].file);
-  sprint("%s\n",path);
+//  sprint("%s\n",path);
 
 //read the unique content from path
   spike_file_t *f = spike_file_open(path,O_RDONLY,0);
@@ -49,7 +49,7 @@ void print_line(addr_line *line){
   spike_file_read(f,error_code,mystat.st_size);
   spike_file_close(f);
 
-  sprint("error_code: %s\n",error_code);
+ // sprint("error_code: %s\n",error_code);
 //  printu("")
 
 
@@ -71,7 +71,7 @@ void print_line(addr_line *line){
 void print_error(){
   uint64 mepc = read_csr(mepc);
 
-  sprint("current -> line_ind: %d\n",current -> line_ind);
+ // sprint("current -> line_ind: %d\n",current -> line_ind);
 
   for(int i = 0;i < current -> line_ind;i ++)
     if(mepc < current -> line[i].addr){
@@ -86,7 +86,7 @@ void print_error(){
 void handle_mtrap() {
   uint64 mcause = read_csr(mcause);
 
-  sprint("%d\n",mcause);
+ // sprint("%d\n",mcause);
 
   switch (mcause) {
     case CAUSE_MTIMER:
