@@ -5,6 +5,7 @@
 #include "util/types.h"
 #include "kernel/riscv.h"
 #include "kernel/config.h"
+#include "kernel/sync_utils.h"
 #include "spike_interface/spike_utils.h"
 
 //
@@ -41,11 +42,11 @@ riscv_regs g_itrframe;
 void init_dtb(uint64 dtb) {
   // defined in spike_interface/spike_htif.c, enabling Host-Target InterFace (HTIF)
   query_htif(dtb);
-  if (htif) sprint("HTIF is available!\r\n");
+  //if (htif) sprint("HTIF is available!\r\n");
 
   // defined in spike_interface/spike_memory.c, obtain information about emulated memory
   query_mem(dtb);
-  sprint("(Emulated) memory size: %ld MB\n", g_mem_size >> 20);
+  //print("(Emulated) memory size: %ld MB\n", g_mem_size >> 20);
 }
 
 //
@@ -90,16 +91,22 @@ void timerinit(uintptr_t hartid) {
 //
 // m_start: machine mode C entry point.
 //
+int pivot = 0;
 void m_start(uintptr_t hartid, uintptr_t dtb) {
   // init the spike file interface (stdin,stdout,stderr)
   // functions with "spike_" prefix are all defined in codes under spike_interface/,
   // sprint is also defined in spike_interface/spike_utils.c
-  spike_file_init();
+  if(hartid == 0){
+    spike_file_init();
+    init_dtb(dtb);
+  }
+  sync_barrier(&pivot,NCPU);
   sprint("In m_start, hartid:%d\n", hartid);
+  write_tp(hartid);
 
   // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
   // init_dtb() is defined above.
-  init_dtb(dtb);
+  //init_dtb(dtb);
 
   // save the address of trap frame for interrupt in M mode to "mscratch". added @lab1_2
   write_csr(mscratch, &g_itrframe);
