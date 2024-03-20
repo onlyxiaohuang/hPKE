@@ -83,6 +83,10 @@
 #define MIE_MTIE (1L << 7)   // timer
 #define MIE_MSIE (1L << 3)   // software
 
+//changed @ lab2_challenge2
+#define PAGEUP(sz) (((sz) + PGSIZE - 1) & (~(PGSIZE - 1) ))
+#define PAGEDOWN(a) (((a)) & ~(PGSIZE - 1))
+
 #define read_const_csr(reg)              \
   ({                                     \
     unsigned long __tmp;                 \

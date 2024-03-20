@@ -3,6 +3,14 @@
 
 #include "riscv.h"
 
+//changed @ lab2_challenge2
+typedef struct HMCB{
+  struct HMCB *ne;
+  int size;
+  int offset;
+  int busy;
+}HMCB;
+
 /* --- utility functions for virtual address mapping --- */
 int map_pages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm);
 // permission codes.
@@ -30,5 +38,6 @@ void kern_vm_init(void);
 void *user_va_to_pa(pagetable_t page_dir, void *va);
 void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
+uint64 user_vm_malloc(pagetable_t page_dir, uint64 pre_size, uint64 now_size);
 
 #endif

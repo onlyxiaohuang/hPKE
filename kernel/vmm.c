@@ -193,3 +193,17 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   free_page((void *)((*pte >> 10) << 12));
   *pte &= (~PTE_V);
 }
+
+uint64 user_vm_malloc(pagetable_t page_dir,uint64 pre_size,uint64 now_size){
+  if(pre_size < now_size){
+    uint64 pre = pre_size = PAGEUP(pre_size);
+    while(pre < now_size){
+      char * tmp = (char *) alloc_page();
+      memset(tmp ,0 ,PGSIZE * sizeof(uint8));
+      map_pages(page_dir,pre_size,PGSIZE,(uint64)tmp,prot_to_type(PROT_READ|PROT_WRITE,1));
+      pre += PGSIZE;
+    }
+    return now_size;
+  }
+  return pre_size;
+}
