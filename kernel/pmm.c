@@ -1,3 +1,4 @@
+#include "sync_utils.h"
 #include "pmm.h"
 #include "util/functions.h"
 #include "riscv.h"
@@ -50,13 +51,23 @@ void free_page(void *pa) {
 // takes the first free page from g_free_mem_list, and returns (allocates) it.
 // Allocates only ONE page!
 //
+int g_free_mem_lock = 0;
 void *alloc_page(void) {
-  list_node *n = g_free_mem_list.next;
-  uint64 hartid = 0;
+//  list_node *n = g_free_mem_list.next;
+  list_node *n = NULL;
+  uint64 hartid = read_tp();
+
+  spin_lock(&g_free_mem_lock);
+
+  n = g_free_mem_list.next;
+
   if (vm_alloc_stage[hartid]) {
     sprint("hartid = %ld: alloc page 0x%x\n", hartid, n);
   }
   if (n) g_free_mem_list.next = n->next;
+
+  spin_unlock(&g_free_mem_lock);
+
   return (void *)n;
 }
 

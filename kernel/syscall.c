@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <errno.h>
 
+#include "sync_utils.h"
 #include "util/types.h"
 #include "syscall.h"
 #include "string.h"
@@ -20,8 +21,8 @@
 ssize_t sys_user_print(const char* buf, size_t n) {
   // buf is now an address in user space of the given app's user stack,
   // so we have to transfer it into phisical address (kernel is running in direct mapping).
-  assert( current );
-  char* pa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)buf);
+  assert( current[read_tp()] );
+  char* pa = (char*)user_va_to_pa((pagetable_t)(current[read_tp()]->pagetable), (void*)buf);
   sprint(pa);
   return 0;
 }
@@ -29,12 +30,17 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 // implement the SYS_user_exit syscall
 //
+int exit_cnt = 0;
 ssize_t sys_user_exit(uint64 code) {
-  sprint("hartid = ?: User exit with code:%d.\n", code);
+  sprint("hartid = %d: User exit with code:%d.\n",current[read_tp()] -> hartid, code);
   // in lab1, PKE considers only one app (one process). 
   // therefore, shutdown the system when the app calls exit()
-  sprint("hartid = ?: shutdown with code:%d.\n", code);
-  shutdown(code);
+  sync_barrier(&exit_cnt,NCPU);
+  if(current[read_tp()] -> hartid == 0){
+    sprint("hartid = %d: shutdown with code:%d.\n", current[read_tp()] -> hartid, code);
+    shutdown(code);
+  }
+  return 0;
 }
 
 //
@@ -42,11 +48,11 @@ ssize_t sys_user_exit(uint64 code) {
 //
 uint64 sys_user_allocate_page() {
   void* pa = alloc_page();
-  uint64 va = g_ufree_page;
-  g_ufree_page += PGSIZE;
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+  uint64 va = g_ufree_page[read_tp()];
+  g_ufree_page[read_tp()] += PGSIZE;
+  user_vm_map((pagetable_t)current[read_tp()]->pagetable, va, PGSIZE, (uint64)pa,
          prot_to_type(PROT_WRITE | PROT_READ, 1));
-  sprint("hartid = ?: vaddr 0x%x is mapped to paddr 0x%x\n", va, pa);
+  sprint("hartid = %d: vaddr 0x%x is mapped to paddr 0x%x\n", read_tp(), va, pa);
   return va;
 }
 
@@ -54,7 +60,7 @@ uint64 sys_user_allocate_page() {
 // reclaim a page, indicated by "va". added @lab2_2
 //
 uint64 sys_user_free_page(uint64 va) {
-  user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+  user_vm_unmap((pagetable_t)current[read_tp()]->pagetable, va, PGSIZE, 1);
   return 0;
 }
 
