@@ -76,3 +76,13 @@ int fork() {
 void yield() {
   do_user_call(SYS_user_yield, 0, 0, 0, 0, 0, 0, 0);
 }
+
+int sem_new(int val){
+  return do_user_call(SYS_user_sem_new,(uint64)val,0,0,0,0,0,0);
+}
+void sem_P(int sem){
+  do_user_call(SYS_user_sem_P,(uint64)sem,0,0,0,0,0,0);
+}
+void sem_V(int sem){
+  do_user_call(SYS_user_sem_V,(uint64)sem,0,0,0,0,0,0);
+}

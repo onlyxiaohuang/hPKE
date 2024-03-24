@@ -251,3 +251,46 @@ int do_fork( process* parent)
 
   return child->pid;
 }
+
+SEM sems[NPROC];
+//get an available sem
+int sem_init(int val){
+  for(int i = 0;i < NPROC;i ++){
+    if(!sems[i].busy){
+      sems[i].busy = 1;
+      sems[i].head = NULL;
+      sems[i].tail = NULL;
+      sems[i].val = val;
+      return i;
+    }
+  }
+  return -200;
+}
+
+void P(int ind){//P instruction
+  sems[ind].val --;
+  if(sems[ind].val < 0){
+    if(sems[ind].head){
+      sems[ind].tail -> queue_next = current -> queue_next;
+      sems[ind].tail = current;
+    }
+    else{
+      sems[ind].tail = current;
+      sems[ind].head = current;
+    }
+    current -> status = BLOCKED;
+    schedule();
+  }
+}
+
+void V(int ind){//V instruction
+  sems[ind].val ++;
+  if(sems[ind].head){
+    process *p = sems[ind].head;
+    sems[ind].head = p -> queue_next;
+    if(!sems[ind].head){
+      sems[ind].tail = sems[ind].head;
+    }
+    insert_to_ready_queue(p);
+  }
+}

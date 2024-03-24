@@ -91,6 +91,13 @@ typedef struct process_t {
   int tick_count;
 }process;
 
+//added @ lab3_challenge2
+typedef struct SEM{
+  int val;
+  process *head,*tail;
+  int busy;
+}SEM;
+
 // switch to run user app
 void switch_to(process*);
 
@@ -102,6 +109,11 @@ process* alloc_process();
 int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
+
+int sem_init(int val);
+void P(int ind);
+void V(int ind);
+
 
 // current running process
 extern process* current;
