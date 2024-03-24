@@ -173,7 +173,7 @@ int free_process(process *proc)
   // as it is different from regular OS, which needs to run 7x24.
   proc->status = ZOMBIE;
   // sprint("process %d is free.\n", proc->pid);
-  if (proc->pid == 0) // 0号进程退出，程序终止
+  if (proc->pid == 0)
     return 0;
   return 0;
 }
@@ -197,9 +197,9 @@ int do_fork(process *parent)
       for (int j = 0; j < parent->mapped_info[i].npages; j++)
       {
         uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
-        // 使用写时复制模式映射代码段
+        
         map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
-                  addr, prot_to_type(PROT_READ | PROT_EXEC, 1)); // 只读映射
+                  addr, prot_to_type(PROT_READ | PROT_EXEC, 1)); 
         sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
                addr, parent->mapped_info[i].va + j * PGSIZE);
       }
@@ -213,9 +213,9 @@ int do_fork(process *parent)
       for (int j = 0; j < parent->mapped_info[i].npages; j++)
       {
         uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
-        // 使用写时复制模式映射数据段
+        
         map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
-                  addr, prot_to_type(PROT_READ, 1)); // 只读映射
+                  addr, prot_to_type(PROT_READ, 1)); 
       }
       child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
       child->mapped_info[child->total_mapped_region].npages =
@@ -225,25 +225,25 @@ int do_fork(process *parent)
       break;
     // added on lab3_c3
     case HEAP_SEGMENT:
-      // 需要复制父进程的堆空间
+      
       for (uint64 heap_block = current->user_heap.heap_bottom;
           heap_block < current->user_heap.heap_top; heap_block += PGSIZE) 
       {
         uint64 parent_pa = lookup_pa(parent->pagetable, heap_block);
-        // 使用写时复制模式映射堆空间
+        
         user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, parent_pa,
                     prot_to_type(PROT_READ, 1));
-        // 设置pte
+        
         pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
         if(child_pte == NULL) {
           panic("error when mapping heap segment!");
         }
-        *child_pte |= PTE_C; // 设置写时复制标志
+        *child_pte |= PTE_C; 
         pte_t *parent_pte = page_walk(parent->pagetable, heap_block, 0);
         if(parent_pte == NULL) {
           panic("error when mapping heap segment!");
         }
-        *parent_pte &= (~PTE_W); // 设置父进程的pte为只读
+        *parent_pte &= (~PTE_W); 
 
       }
       child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
