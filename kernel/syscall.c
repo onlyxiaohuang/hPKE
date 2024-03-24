@@ -93,12 +93,15 @@ ssize_t sys_user_yield() {
   current -> status = READY;
   insert_to_ready_queue(current);
   schedule();
+<<<<<<< HEAD
   return 0;
 }
 ssize_t sys_user_printpa(uint64 va)
 {
   uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current->pagetable), (void*)va);
   sprint("%lx\n", pa);
+=======
+>>>>>>> lab3_3_rrsched
   return 0;
 }
 
