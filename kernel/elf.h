@@ -60,9 +60,15 @@ typedef struct elf_ctx_t {
   elf_header ehdr;
 } elf_ctx;
 
+typedef union {
+  uint64 buf[MAX_CMDLINE_ARGS];
+  char *argv[MAX_CMDLINE_ARGS];
+} arg_buf;
+
+
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
-void load_bincode_from_host_elf(process *p);
+void load_bincode_from_host_elf(process *p,char *pfn);
 
 #endif

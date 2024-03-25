@@ -107,6 +107,8 @@ int free_process( process* proc );
 // fork a child from parent
 int do_fork(process* parent);
 
+
+extern process* load_user_program(char *pfn);
 // current running process
 extern process* current;
 
