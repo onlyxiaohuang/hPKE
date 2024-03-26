@@ -155,8 +155,55 @@ process* alloc_process() {
   procs[i].pfiles = init_proc_file_management();
   sprint("in alloc_proc. build proc_file_management successfully.\n");
 
+  procs[i].parent = NULL;
+  procs[i].waitpid = 0;
   // return after initialization.
   return &procs[i];
+}
+
+void reset_process(process *p){
+  p -> trapframe = (trapframe *) alloc_page();
+  memset(p -> trapframe,0,sizeof(trapframe));
+
+  p -> pagetable = (pagetable_t)alloc_page();
+  memset((void *)p -> pagetable,0,PGSIZE);
+
+  p -> kstack = (uint64)alloc_page() + PGSIZE;
+  uint64 user_stack = (uint64)alloc_page();
+  p -> trapframe -> regs.sp = USER_STACK_TOP;
+
+  p -> mapped_info = (mapped_region *)alloc_page();
+  memset(p -> mapped_info,0,PGSIZE);
+  
+  user_vm_map((pagetable_t)p -> pagetable,USER_STACK_TOP - PGSIZE,
+  PGSIZE,user_stack,prot_to_type(PROT_WRITE | PROT_READ,1));
+
+  p -> mapped_info[STACK_SEGMENT].va = USER_STACK_TOP - PGSIZE;
+  p -> mapped_info[STACK_SEGMENT].npages = 1;
+  p -> mapped_info[STACK_SEGMENT].seg_type = STACK_SEGMENT;
+
+  user_vm_map((pagetable_t)p -> pagetable, (uint64)p -> trapframe,PGSIZE,
+  (uint64)p -> trapframe,prot_to_type(PROT_WRITE | PROT_READ, 0));
+  p -> mapped_info[CONTEXT_SEGMENT].va = (uint64) p -> trapframe;
+  p -> mapped_info[CONTEXT_SEGMENT].npages = 1;
+  p -> mapped_info[CONTEXT_SEGMENT].seg_type = CONTEXT_SEGMENT;
+
+  user_vm_map((pagetable_t)p -> pagetable,(uint64)trap_sec_start,PGSIZE,
+  (uint64)trap_sec_start,prot_to_type(PROT_READ | PROT_EXEC,0));
+  p -> mapped_info[SYSTEM_SEGMENT].va = (uint64)trap_sec_start;
+  p -> mapped_info[SYSTEM_SEGMENT].npages = 1;
+  p -> mapped_info[SYSTEM_SEGMENT].seg_type = SYSTEM_SEGMENT;
+
+  p -> user_heap.heap_top = USER_FREE_ADDRESS_START;
+  p -> user_heap.heap_bottom = USER_FREE_ADDRESS_START;
+  p -> user_heap.free_pages_count = 0;
+
+  p -> mapped_info[HEAP_SEGMENT].va = USER_FREE_ADDRESS_START;
+  p -> mapped_info[HEAP_SEGMENT].npages = 0;
+  p -> mapped_info[HEAP_SEGMENT].seg_type = HEAP_SEGMENT;
+
+  p -> total_mapped_region = 4;
+
 }
 
 //
@@ -201,30 +248,39 @@ int do_fork( process* parent)
         // convert free_pages_address into a filter to skip reclaimed blocks in the heap
         // when mapping the heap blocks
         
-        memset(free_block_filter, 0, MAX_HEAP_PAGES);
-        uint64 heap_bottom = parent->user_heap.heap_bottom;
-        for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
-          int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
-          free_block_filter[index] = 1;
-        }
+        {
+          int free_block_filter[MAX_HEAP_PAGES];
+          memset(free_block_filter, 0, MAX_HEAP_PAGES);
+          uint64 heap_bottom = parent->user_heap.heap_bottom;
+          for (int i = 0; i < parent->user_heap.free_pages_count; i++)
+          {
+            int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
+            free_block_filter[index] = 1;
+          }
 
-        // copy and map the heap blocks
-        for (uint64 heap_block = current->user_heap.heap_bottom;
-             heap_block < current->user_heap.heap_top; heap_block += PGSIZE) {
-          if (free_block_filter[(heap_block - heap_bottom) / PGSIZE])  // skip free blocks
-            continue;
+          // copy and map the heap blocks
+          for (uint64 heap_block = current->user_heap.heap_bottom;
+              heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
+          {
+            if (free_block_filter[(heap_block - heap_bottom) / PGSIZE]) // skip free blocks
+              continue;
 
-          void* child_pa = alloc_page();
-          memcpy(child_pa, (void*)lookup_pa(parent->pagetable, heap_block), PGSIZE);
-          user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
-                      prot_to_type(PROT_WRITE | PROT_READ, 1));
+            // void *child_pa = alloc_page();
+            // memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+            // user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
+            //             prot_to_type(PROT_WRITE | PROT_READ, 1));
+            // COW: just map (not cp) heap here
+            uint64 child_pa = lookup_pa(parent->pagetable, heap_block);
+            user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, child_pa, prot_to_type(PROT_READ | PROT_COW, 1));
+          }
         }
 
         child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
 
         // copy the heap manager from parent to child
-        memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
+        memcpy((void *)&child->user_heap, (void *)&parent->user_heap, sizeof(parent->user_heap));
         break;
+
       case CODE_SEGMENT:
         // TODO (lab3_1): implment the mapping of child code segment to parent's
         // code segment.
@@ -245,6 +301,24 @@ int do_fork( process* parent)
         child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
         child->total_mapped_region++;
         break;
+
+      case DATA_SEGMENT:
+      {
+        for(int j = 0;j < parent -> mapped_info[i].npages;j ++){
+          uint64 addr = lookup_pa(parent -> pagetable,parent -> mapped_info[i].va + j * PGSIZE);
+          char *newaddr = alloc_page();
+          memcpy(newaddr,(void *)addr,PGSIZE);
+          map_pages(child -> pagetable,parent -> mapped_info[i].va + j * PGSIZE,PGSIZE,
+          (uint64)newaddr,prot_to_type(PROT_WRITE | PROT_READ,1));
+        }
+
+        child -> mapped_info[child -> total_mapped_region].va = parent -> mapped_info[i].va;
+        child -> mapped_info[child -> total_mapped_region].npages = parent -> mapped_info[i].npages;
+        child -> mapped_info[child -> total_mapped_region].seg_type = DATA_SEGMENT;
+        child -> total_mapped_region ++;
+        sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",lookup_pa(parent -> pagetable,parent -> mapped_info[i].va),parent -> mapped_info[i].va);
+        break;
+      }
     }
   }
 

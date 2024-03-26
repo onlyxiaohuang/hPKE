@@ -63,7 +63,8 @@ static size_t parse_args(arg_buf *arg_bug_msg) {
 // load the elf, and construct a "process" (with only a trapframe).
 // load_bincode_from_host_elf is defined in elf.c
 //
-process* load_user_program() {
+
+/*process* load_user_program() {
   process* proc;
 
   proc = alloc_process();
@@ -74,6 +75,43 @@ process* load_user_program() {
   // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
   if (!argc) panic("You need to specify the application program!\n");
+
+  load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
+  return proc;
+}*/
+
+int load_exec_program(char* command,char* param){
+  reset_process(current);
+
+  load_bincode_from_host_elf(current,command);
+
+  size_t *vsp = (size_t *) current -> trapframe -> regs.sp;
+  vsp -= 8;
+  size_t *sp = (size_t *)user_va_to_pa(current -> pagetable,(void *)vsp);
+  memcpy((char *)sp, param, 1 + strlen(param));
+
+  vsp --,sp --;
+  *sp = (size_t)(1 + vsp);
+
+  current -> trapframe -> regs.sp = (uint64)vsp;
+  current -> trapframe -> regs.a0 = (uint64)1;
+  current -> trapframe -> regs.a1 = (uint64)vsp;
+
+  return 1;
+
+}
+
+process* load_ori_program(){
+  process* proc;
+
+  proc = alloc_process();
+  sprint("User application is loading.\n");
+
+  arg_buf arg_bug_msg;
+
+
+  size_t argc = parse_args(&arg_bug_msg);
+  if(!argc) panic("You need to specify the application program!\n");
 
   load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
   return proc;
@@ -109,7 +147,7 @@ int s_start(void) {
   sprint("Switch to user mode...\n");
   // the application code (elf) is first loaded into memory, and then put into execution
   // added @lab3_1
-  insert_to_ready_queue( load_user_program() );
+  insert_to_ready_queue( load_ori_program() );
   schedule();
 
   // we should never reach here.

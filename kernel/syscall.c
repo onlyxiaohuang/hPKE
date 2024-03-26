@@ -32,10 +32,16 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 // implement the SYS_user_exit syscall
 //
+
+extern process procs[NPROC];
 ssize_t sys_user_exit(uint64 code) {
   sprint("User exit with code:%d.\n", code);
   // reclaim the current process, and reschedule. added @lab3_1
   free_process( current );
+  if(current -> parent != NULL && current -> parent -> waitpid == current -> pid){
+    current -> parent -> status = READY;
+    insert_to_ready_queue(current -> parent);
+  }
   schedule();
   return 0;
 }
@@ -215,6 +221,23 @@ ssize_t sys_user_unlink(char * vfn){
   return do_unlink(pfn);
 }
 
+
+ssize_t sys_user_execute(char *vcommand,char *vparam){
+  char *command = (char *)user_va_to_pa((pagetable_t)(current -> pagetable),(void *)vcommand);
+  char *param = (char *)user_va_to_pa((pagetable_t)(current -> pagetable),(void *)vparam);
+  return load_exec_program(command,param);
+}
+
+ssize_t sys_user_wait(int pid){
+  if(pid == 0 || procs[pid].parent != current){
+    return -1;
+  }
+  current -> status = BLOCKED;
+  current -> waitpid = pid;
+  schedule();
+  return pid;
+}
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -263,6 +286,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_link((char *)a1, (char *)a2);
     case SYS_user_unlink:
       return sys_user_unlink((char *)a1);
+    case SYS_user_execute:
+      return sys_user_execute((char *)a1,(char *)a2);
+    case SYS_user_wait:
+      return sys_user_wait((uint64)a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }

@@ -81,6 +81,7 @@ typedef struct process_t {
 
   // process id
   uint64 pid;
+  uint64 waitpid;
   // process status
   int status;
   // parent process
@@ -109,5 +110,8 @@ int do_fork(process* parent);
 
 // current running process
 extern process* current;
+
+void reset_process(process *p);
+extern int load_exec_program(char *command,char *param);
 
 #endif
